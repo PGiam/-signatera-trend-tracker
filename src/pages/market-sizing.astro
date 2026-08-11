@@ -1,0 +1,31 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import MarketSizingCalculator from '../components/MarketSizingCalculator.tsx';
+import { SOURCES } from '../lib/market-data.js';
+---
+<DashboardLayout title="Market Sizing · Signatera Trend Tracker">
+  <h1 class="text-xl font-semibold text-slate-900">Market sizing</h1>
+  <p class="mt-1 text-sm text-slate-500">
+    Projected annual Signatera revenue from newly diagnosed patients in its three most established indications —
+    colorectal, breast, and muscle-invasive bladder cancer — based on published incidence data. Adjust the
+    assumptions below; everything recalculates live.
+  </p>
+
+  <div class="mt-6">
+    <MarketSizingCalculator client:load />
+  </div>
+
+  <section class="mt-6 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-xs text-slate-500">
+    <p class="font-medium text-slate-600">Sources</p>
+    <ul class="mt-1 space-y-0.5">
+      {SOURCES.map((s) => (
+        <li><a href={s.url} target="_blank" rel="noopener noreferrer" class="text-accent-600 hover:underline">{s.label}</a></li>
+      ))}
+    </ul>
+    <p class="mt-2">
+      This models revenue from newly diagnosed patients only — it doesn't include Signatera's other indications
+      (ovarian cancer, immunotherapy monitoring across solid tumors), existing/prevalent patients already on
+      testing regimens, or year-over-year incidence growth. Treat it as a directional estimate, not a forecast.
+    </p>
+  </section>
+</DashboardLayout>
