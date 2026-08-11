@@ -51,6 +51,7 @@ export default function TrendChart({
                 strokeWidth={2}
                 dot={{ r: 3 }}
                 activeDot={{ r: 5 }}
+                connectNulls
               />
             ))}
           </LineChart>
