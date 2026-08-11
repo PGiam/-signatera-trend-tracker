@@ -16,13 +16,13 @@ const supabase = getServiceClient();
 const { data: products } = await supabase.from('products').select('id, slug, display_name').order('id');
 const productsBySlug = Object.fromEntries((products ?? []).map((p) => [p.slug, p]));
 
-const cutoff = new Date();
-cutoff.setDate(cutoff.getDate() - 12 * 7);
-
+// No date cutoff — show the full history available. published_at now
+// reflects real post/article dates (not scrape date), which can go back
+// years, so this intentionally isn't scoped to a rolling recent window.
 const { data: weeklyRows, error } = await supabase
   .from('mention_rollups_weekly')
   .select('week_start, product_id, author_type, mention_count, avg_sentiment_score')
-  .gte('week_start', cutoff.toISOString().slice(0, 10));
+  .order('week_start', { ascending: true });
 
 const byWeek = collapseWeekly(weeklyRows ?? [], authorTypesForView(view));
 const { volume, sentiment, weeks } = buildChartSeries(byWeek, productsBySlug);
