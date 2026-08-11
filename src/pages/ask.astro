@@ -1,0 +1,14 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import AskBox from '../components/AskBox.tsx';
+---
+<DashboardLayout title="Ask · Signatera Trend Tracker">
+  <h1 class="text-xl font-semibold text-slate-900">Ask the data</h1>
+  <p class="mt-1 text-sm text-slate-500">
+    Questions are answered from the collected mentions and trend rollups only, via a read-only query — nothing here can
+    modify the underlying data.
+  </p>
+  <div class="mt-6">
+    <AskBox client:load />
+  </div>
+</DashboardLayout>

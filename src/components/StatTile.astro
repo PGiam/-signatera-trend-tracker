@@ -1,0 +1,30 @@
+---
+// tone 'status' renders the delta in the fixed status palette (good/critical)
+// with an icon + label — reserved for genuinely good/bad signals like a
+// sentiment swing. tone 'neutral' (default) renders direction without
+// implying good/bad — appropriate for mention-volume changes, where "more
+// mentions" isn't inherently positive or negative news.
+export interface Props {
+  label: string;
+  value: string;
+  deltaText?: string;
+  deltaDirection?: 'up' | 'down' | 'flat';
+  tone?: 'neutral' | 'status';
+}
+const { label, value, deltaText, deltaDirection, tone = 'neutral' } = Astro.props;
+
+const arrow = deltaDirection === 'up' ? '↑' : deltaDirection === 'down' ? '↓' : '→';
+
+let deltaClass = 'text-slate-500';
+if (tone === 'status' && deltaDirection === 'up') deltaClass = 'text-[#006300]';
+if (tone === 'status' && deltaDirection === 'down') deltaClass = 'text-[#d03b3b]';
+---
+<div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+  <p class="text-sm font-medium text-slate-500">{label}</p>
+  <p class="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
+  {deltaText && (
+    <p class={`mt-1 text-sm font-medium ${deltaClass}`}>
+      <span aria-hidden="true">{arrow}</span> {deltaText}
+    </p>
+  )}
+</div>

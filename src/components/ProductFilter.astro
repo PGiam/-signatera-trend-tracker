@@ -1,0 +1,36 @@
+---
+import { PRODUCT_COLORS } from '../lib/product-colors.js';
+
+export interface Props {
+  current: string; // 'all' or a product slug
+  basePath: string;
+  extraParams?: Record<string, string>;
+}
+const { current, basePath, extraParams = {} } = Astro.props;
+
+function hrefFor(slug: string) {
+  const params = new URLSearchParams({ ...extraParams, product: slug });
+  return `${basePath}?${params.toString()}`;
+}
+---
+<div class="flex flex-wrap gap-2">
+  <a
+    href={hrefFor('all')}
+    class={`rounded-full border px-3 py-1 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 ${
+      current === 'all' ? 'border-accent-600 bg-accent-50 text-accent-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+    }`}
+  >
+    All products
+  </a>
+  {Object.entries(PRODUCT_COLORS).map(([slug, meta]) => (
+    <a
+      href={hrefFor(slug)}
+      class={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 ${
+        current === slug ? 'border-accent-600 bg-accent-50 text-accent-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+      }`}
+    >
+      <span class="h-2 w-2 rounded-full" style={`background-color:${meta.light}`}></span>
+      {meta.label}
+    </a>
+  ))}
+</div>

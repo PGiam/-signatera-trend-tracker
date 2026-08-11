@@ -1,0 +1,117 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import AuthorTypeToggle from '../components/AuthorTypeToggle.astro';
+import StatTile from '../components/StatTile.astro';
+import TrendChart from '../components/TrendChart.tsx';
+import { getServiceClient } from '../lib/supabase.js';
+import { PRODUCT_COLORS } from '../lib/product-colors.js';
+import { authorTypesForView, collapseWeekly, buildChartSeries, computeWowStats, computeShareOfVoice } from '../lib/trends.js';
+
+const view = ['all', 'patient', 'doctor'].includes(Astro.url.searchParams.get('view'))
+  ? Astro.url.searchParams.get('view')
+  : 'all';
+
+const supabase = getServiceClient();
+
+const { data: products } = await supabase.from('products').select('id, slug, display_name').order('id');
+const productsBySlug = Object.fromEntries((products ?? []).map((p) => [p.slug, p]));
+
+const cutoff = new Date();
+cutoff.setDate(cutoff.getDate() - 12 * 7);
+
+const { data: weeklyRows, error } = await supabase
+  .from('mention_rollups_weekly')
+  .select('week_start, product_id, author_type, mention_count, avg_sentiment_score')
+  .gte('week_start', cutoff.toISOString().slice(0, 10));
+
+const byWeek = collapseWeekly(weeklyRows ?? [], authorTypesForView(view));
+const { volume, sentiment, weeks } = buildChartSeries(byWeek, productsBySlug);
+const wow = computeWowStats(byWeek, weeks, productsBySlug);
+const shareOfVoice = computeShareOfVoice(byWeek, weeks, productsBySlug);
+
+const series = Object.entries(productsBySlug).map(([slug, p]) => ({
+  slug,
+  label: p.display_name,
+  color: PRODUCT_COLORS[slug]?.light ?? '#2a78d6',
+}));
+
+function pct(n) {
+  return n == null ? '—' : `${n > 0 ? '+' : ''}${n.toFixed(0)}%`;
+}
+function shareText(n) {
+  return n == null ? '—' : `${(n * 100).toFixed(0)}% of weekly mentions`;
+}
+---
+<DashboardLayout title="Trends · Signatera Trend Tracker">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-slate-900">Mention & sentiment trends</h1>
+    <AuthorTypeToggle current={view} basePath="/" />
+  </div>
+
+  {!weeklyRows || weeklyRows.length === 0 ? (
+    <p class="mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
+      No data yet — this dashboard fills in once the ingestion, classification, and aggregation pipelines have run at
+      least once. {error && <span class="block mt-1 text-sm text-red-600">{error.message}</span>}
+    </p>
+  ) : (
+    <>
+      <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {Object.entries(productsBySlug).map(([slug, p]) => {
+          const stat = wow[slug];
+          return (
+            <StatTile
+              label={`${p.display_name} — mentions this week`}
+              value={String(stat?.mentionCount ?? 0)}
+              deltaText={stat?.volumeDeltaPct != null ? `${pct(stat.volumeDeltaPct)} vs last week` : 'no prior week data'}
+              deltaDirection={stat?.volumeDeltaPct == null ? 'flat' : stat.volumeDeltaPct >= 0 ? 'up' : 'down'}
+              tone="neutral"
+            />
+          );
+        })}
+      </div>
+
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {Object.entries(productsBySlug).map(([slug, p]) => {
+          const stat = wow[slug];
+          return (
+            <StatTile
+              label={`${p.display_name} — sentiment`}
+              value={stat?.avgSentiment != null ? stat.avgSentiment.toFixed(2) : '—'}
+              deltaText={stat?.sentimentDelta != null ? `${stat.sentimentDelta >= 0 ? '+' : ''}${stat.sentimentDelta.toFixed(2)} vs last week` : undefined}
+              deltaDirection={stat?.sentimentDelta == null ? 'flat' : stat.sentimentDelta >= 0 ? 'up' : 'down'}
+              tone="status"
+            />
+          );
+        })}
+      </div>
+
+      <section class="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900">Weekly mention volume</h2>
+        <div class="mt-4">
+          <TrendChart client:load data={volume} series={series} yLabel="Mentions" />
+        </div>
+      </section>
+
+      <section class="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900">Weekly average sentiment</h2>
+        <p class="text-xs text-slate-500">-1.00 (very negative) to 1.00 (very positive)</p>
+        <div class="mt-4">
+          <TrendChart client:load data={sentiment} series={series} yLabel="Avg. sentiment" />
+        </div>
+      </section>
+
+      <section class="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900">Share of voice (most recent week)</h2>
+        <ul class="mt-3 space-y-2">
+          {Object.entries(productsBySlug).map(([slug, p]) => (
+            <li class="flex items-center gap-3 text-sm">
+              <span class="h-2.5 w-2.5 rounded-full" style={`background-color:${PRODUCT_COLORS[slug]?.light}`}></span>
+              <span class="w-40 text-slate-700">{p.display_name}</span>
+              <span class="text-slate-500">{shareText(shareOfVoice[slug])}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  )}
+</DashboardLayout>

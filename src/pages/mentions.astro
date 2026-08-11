@@ -1,0 +1,83 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import AuthorTypeToggle from '../components/AuthorTypeToggle.astro';
+import ProductFilter from '../components/ProductFilter.astro';
+import MentionFeedCard from '../components/MentionFeedCard.astro';
+import { getServiceClient } from '../lib/supabase.js';
+import { authorTypesForView } from '../lib/trends.js';
+
+const PAGE_SIZE = 25;
+
+const view = ['all', 'patient', 'doctor'].includes(Astro.url.searchParams.get('view'))
+  ? Astro.url.searchParams.get('view')
+  : 'all';
+const product = Astro.url.searchParams.get('product') ?? 'all';
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+
+const supabase = getServiceClient();
+
+let query = supabase
+  .from('mentions_for_query')
+  .select('id, source, platform, url, product, author_type, sentiment, title, excerpt, published_at, discovered_at', {
+    count: 'exact',
+  })
+  .order('discovered_at', { ascending: false })
+  .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+const allowedAuthorTypes = authorTypesForView(view);
+if (allowedAuthorTypes) query = query.in('author_type', allowedAuthorTypes);
+if (product !== 'all') query = query.eq('product', product);
+
+const { data: mentions, count, error } = await query;
+
+const totalPages = count ? Math.ceil(count / PAGE_SIZE) : 1;
+
+function pageHref(targetPage) {
+  const params = new URLSearchParams({ view, product, page: String(targetPage) });
+  return `/mentions?${params.toString()}`;
+}
+---
+<DashboardLayout title="Mentions · Signatera Trend Tracker">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <h1 class="text-xl font-semibold text-slate-900">Mentions</h1>
+    <AuthorTypeToggle current={view} basePath="/mentions" />
+  </div>
+
+  <div class="mt-4">
+    <ProductFilter current={product} basePath="/mentions" extraParams={{ view }} />
+  </div>
+
+  {error && <p class="mt-6 text-sm text-red-600">{error.message}</p>}
+
+  {mentions && mentions.length === 0 ? (
+    <p class="mt-8 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
+      No mentions match these filters yet.
+    </p>
+  ) : (
+    <div class="mt-6 space-y-3">
+      {(mentions ?? []).map((mention) => (
+        <MentionFeedCard mention={mention} />
+      ))}
+    </div>
+  )}
+
+  {totalPages > 1 && (
+    <div class="mt-6 flex items-center justify-between text-sm text-slate-600">
+      <a
+        href={page > 1 ? pageHref(page - 1) : undefined}
+        aria-disabled={page <= 1}
+        class={`rounded-md px-3 py-1.5 font-medium ${page <= 1 ? 'pointer-events-none text-slate-300' : 'hover:bg-slate-100'}`}
+      >
+        ← Previous
+      </a>
+      <span>Page {page} of {totalPages}</span>
+      <a
+        href={page < totalPages ? pageHref(page + 1) : undefined}
+        aria-disabled={page >= totalPages}
+        class={`rounded-md px-3 py-1.5 font-medium ${page >= totalPages ? 'pointer-events-none text-slate-300' : 'hover:bg-slate-100'}`}
+      >
+        Next →
+      </a>
+    </div>
+  )}
+</DashboardLayout>

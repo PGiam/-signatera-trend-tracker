@@ -1,0 +1,29 @@
+---
+// Segmented control for the patient-vs-doctor split. Plain links (no client
+// JS) — the current page re-renders server-side with the new `view` param.
+export interface Props {
+  current: 'all' | 'patient' | 'doctor';
+  basePath: string;
+}
+const { current, basePath } = Astro.props;
+
+const options: Array<{ value: 'all' | 'patient' | 'doctor'; label: string }> = [
+  { value: 'all', label: 'All voices' },
+  { value: 'patient', label: 'Patient-side' },
+  { value: 'doctor', label: 'Doctor-side' },
+];
+---
+<div class="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+  {options.map((opt) => (
+    <a
+      href={`${basePath}?view=${opt.value}`}
+      class={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 ${
+        current === opt.value
+          ? 'bg-accent-600 text-white'
+          : 'text-slate-600 hover:bg-slate-100'
+      }`}
+    >
+      {opt.label}
+    </a>
+  ))}
+</div>

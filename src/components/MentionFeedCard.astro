@@ -1,0 +1,57 @@
+---
+import { PRODUCT_COLORS, AUTHOR_TYPE_LABELS } from '../lib/product-colors.js';
+
+export interface Props {
+  mention: {
+    id: string;
+    source: string;
+    platform: string;
+    url: string;
+    product: string;
+    author_type: string | null;
+    sentiment: string | null;
+    title: string | null;
+    excerpt: string;
+    published_at: string | null;
+    discovered_at: string;
+  };
+}
+const { mention } = Astro.props;
+const productMeta = PRODUCT_COLORS[mention.product as keyof typeof PRODUCT_COLORS];
+const authorLabel = mention.author_type ? AUTHOR_TYPE_LABELS[mention.author_type as keyof typeof AUTHOR_TYPE_LABELS] : 'Unclassified';
+
+const sentimentClass: Record<string, string> = {
+  positive: 'text-[#006300]',
+  negative: 'text-[#d03b3b]',
+  neutral: 'text-slate-500',
+  mixed: 'text-[#c98500]',
+};
+
+const dateLabel = new Date(mention.published_at ?? mention.discovered_at).toLocaleDateString();
+---
+<a
+  href={mention.url}
+  target="_blank"
+  rel="noopener noreferrer"
+  class="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+>
+  <div class="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
+    <span class="inline-flex items-center gap-1.5">
+      {productMeta && <span class="h-2 w-2 rounded-full" style={`background-color:${productMeta.light}`}></span>}
+      {productMeta?.label ?? mention.product}
+    </span>
+    <span>·</span>
+    <span>{mention.platform}</span>
+    <span>·</span>
+    <span>{authorLabel}</span>
+    <span>·</span>
+    <span>{dateLabel}</span>
+    {mention.sentiment && (
+      <span class={`ml-auto font-semibold capitalize ${sentimentClass[mention.sentiment] ?? 'text-slate-500'}`}>
+        {mention.sentiment}
+      </span>
+    )}
+  </div>
+  {mention.title && <p class="mt-2 font-semibold text-slate-900">{mention.title}</p>}
+  <p class="mt-1 line-clamp-3 text-sm text-slate-600">{mention.excerpt}</p>
+</a>
