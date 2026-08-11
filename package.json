@@ -10,6 +10,7 @@
     "fetch:reddit": "node scripts/fetch-reddit.js",
     "fetch:youtube": "node scripts/fetch-youtube.js",
     "fetch:web": "node scripts/fetch-web-discovery.js",
+    "import:manual": "node scripts/import-manual-jsonl.js",
     "classify": "node scripts/score-results.js",
     "aggregate": "node scripts/aggregate-trends.js"
   },
