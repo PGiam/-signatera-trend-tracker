@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { getServiceClient } from './lib/supabase-client.js';
-import { redditApiFetch } from './lib/reddit-auth.js';
+import { redditPublicFetch } from './lib/reddit-fetch.js';
 import { redditDedupKey, insertMentionsIgnoringDuplicates } from './lib/dedup.js';
 import { PRODUCTS, TARGET_SUBREDDITS } from './lib/products.js';
 
@@ -61,7 +61,7 @@ async function searchSitewide() {
   const rows = [];
   for (const product of PRODUCTS) {
     for (const term of product.searchTerms) {
-      const json = await redditApiFetch('/search', { q: term, sort: 'new', limit: 50, type: 'link' });
+      const json = await redditPublicFetch('/search', { q: term, sort: 'new', limit: 50, type: 'link' });
       const posts = json?.data?.children ?? [];
       for (const { data: post } of posts) {
         const row = postToRow(post);
@@ -75,7 +75,7 @@ async function searchSitewide() {
 async function scanTargetSubreddits() {
   const rows = [];
   for (const subreddit of TARGET_SUBREDDITS) {
-    const json = await redditApiFetch(`/r/${subreddit}/new`, { limit: 50 });
+    const json = await redditPublicFetch(`/r/${subreddit}/new`, { limit: 50 });
     const posts = json?.data?.children ?? [];
     for (const { data: post } of posts) {
       const postRow = postToRow(post);
@@ -86,7 +86,7 @@ async function scanTargetSubreddits() {
       // not the OP.
       if (postRow) {
         try {
-          const commentsJson = await redditApiFetch(`/r/${subreddit}/comments/${post.id}`, { limit: 100 });
+          const commentsJson = await redditPublicFetch(`/r/${subreddit}/comments/${post.id}`, { limit: 100 });
           const commentListing = commentsJson?.[1]?.data?.children ?? [];
           for (const { data: comment } of commentListing) {
             if (comment?.body) {

@@ -12,11 +12,8 @@ Tracks public mentions of Signatera, Guardant360, and FoundationOne Liquid acros
 
 Dashboard access uses a single shared passcode (`DASHBOARD_PASSCODE`, set in Netlify env vars), not Supabase Auth — no email/redirect-URL setup needed.
 
-### 2. Reddit API credentials
-1. Log into reddit.com (a dedicated bot account is cleaner than your personal one).
-2. `reddit.com/prefs/apps` → "create another app..." → type **script**, name it (e.g. "Signatera Trend Tracker"), redirect URI `http://localhost:8080` (required field, unused by the auth flow this project uses).
-3. Copy the client ID (string under the app name) and client secret.
-4. Pick a descriptive `REDDIT_USER_AGENT`, e.g. `SignateraTrendTracker/1.0 by u/your-username` — generic user agents get blocked.
+### 2. Reddit — currently disabled, see "Known limitations"
+Both Reddit's OAuth script-app registration (requires manual approval for a moderation use case) and unauthenticated `.json` scraping (blocked outright — redirects to a login wall) are dead ends right now. `scripts/fetch-reddit.js` and the `ingest.yml` job for it are left in place but not wired into the cron schedule. Nothing to set up here unless you revisit this later.
 
 ### 3. YouTube API key
 1. console.cloud.google.com → new project (or reuse one) → API Library → enable **YouTube Data API v3**.
@@ -26,7 +23,7 @@ Dashboard access uses a single shared passcode (`DASHBOARD_PASSCODE`, set in Net
 ### 4. GitHub repo + Actions secrets
 1. Push this folder to a new private GitHub repo.
 2. Repo → Settings → Secrets and variables → Actions, add:
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, `YOUTUBE_API_KEY`.
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `REDDIT_USER_AGENT`, `YOUTUBE_API_KEY`.
 3. The three workflows in `.github/workflows/` (`ingest.yml`, `classify.yml`, `aggregate.yml`) run on cron automatically once secrets are set — no further action needed. You can also trigger any of them manually from the Actions tab (`workflow_dispatch`).
 
 ### 5. Netlify site
@@ -55,6 +52,7 @@ npm run aggregate
 
 ## Known limitations
 
+- **Reddit ingestion is disabled.** Reddit now requires manual, moderation-use-case-gated approval to register a script app (the OAuth flow this project originally used), and separately blocks unauthenticated access to its public `.json` endpoints (redirects to a login wall on both `www.reddit.com` and `old.reddit.com`) — confirmed 2026-08-11, not a config issue on our end. `scripts/fetch-reddit.js` is fully implemented against the unauthenticated endpoints and works as code, it's just blocked upstream. Revisit by either submitting Reddit's approval request (`https://support.reddithelp.com/hc/requests/new?ticket_form_id=14868593862164`) or trying a headless-browser-based scrape, then re-add the `reddit` job to `.github/workflows/ingest.yml`.
 - Doctor-side content will be sparse and skew toward medical-news-site commentary (OncLive, Medscape, Healio, Targeted Oncology) rather than organic reviews — doctors don't generally post public reviews of diagnostic tests the way patients describe their experience.
 - Web discovery is the noisiest ingestion source; classification's `product_match_confidence` filters most false positives, but some will get through, especially early on.
 - Sentiment and author-type classification is an LLM heuristic with stored reasoning per row (`author_type_reasoning`), not ground truth. Trust the trend *direction* over time more than any single row's label.
