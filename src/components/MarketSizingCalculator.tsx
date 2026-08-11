@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CANCER_TYPES, DEFAULT_PRICE_PER_TEST, PRICE_REFERENCE_POINTS } from '../lib/market-data.js';
+import { CANCER_TYPES, DEFAULT_PRICE_PER_TEST, DEFAULT_YEARS_TESTED, PRICE_REFERENCE_POINTS } from '../lib/market-data.js';
 
 const REGIONS = [
   { key: 'us', label: 'United States' },
@@ -20,6 +20,7 @@ export default function MarketSizingCalculator() {
   const [penetration, setPenetration] = useState(10);
   const [testsPerYear, setTestsPerYear] = useState(4);
   const [pricePerTest, setPricePerTest] = useState(DEFAULT_PRICE_PER_TEST);
+  const [yearsTested, setYearsTested] = useState(DEFAULT_YEARS_TESTED);
 
   const rows = useMemo(() => {
     return CANCER_TYPES.flatMap((cancer) =>
@@ -27,18 +28,24 @@ export default function MarketSizingCalculator() {
         const incidentPatients = cancer.incidence[region.key];
         const addressablePatients = incidentPatients * (penetration / 100);
         const annualTests = addressablePatients * testsPerYear;
-        const revenue = annualTests * pricePerTest;
-        return { cancer, region, incidentPatients, addressablePatients, annualTests, revenue };
+        const cohortRevenue = annualTests * pricePerTest;
+        // Run-rate: at steady state, patients from each of the last
+        // `yearsTested` diagnosis-year cohorts are still being actively
+        // monitored simultaneously, so the active testing population — and
+        // the revenue it generates — scales with that overlap.
+        const runRateRevenue = cohortRevenue * yearsTested;
+        return { cancer, region, incidentPatients, addressablePatients, annualTests, cohortRevenue, runRateRevenue };
       })
     );
-  }, [penetration, testsPerYear, pricePerTest]);
+  }, [penetration, testsPerYear, pricePerTest, yearsTested]);
 
-  const totalRevenue = rows.reduce((sum, r) => sum + r.revenue, 0);
+  const totalCohortRevenue = rows.reduce((sum, r) => sum + r.cohortRevenue, 0);
+  const totalRunRateRevenue = rows.reduce((sum, r) => sum + r.runRateRevenue, 0);
   const totalIncident = rows.reduce((sum, r) => sum + r.incidentPatients, 0);
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
         <label className="block">
           <span className="text-xs font-medium text-slate-500">Market penetration (%)</span>
           <input
@@ -89,16 +96,35 @@ export default function MarketSizingCalculator() {
             ))}
           </div>
         </label>
+
+        <label className="block">
+          <span className="text-xs font-medium text-slate-500">Avg. years tested per patient</span>
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={yearsTested}
+            onChange={(e) => setYearsTested(Number(e.target.value))}
+            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+          />
+          <span className="mt-1 block text-xs text-slate-400">
+            Default is BESPOKE's 2-year CRC follow-up window — how long each diagnosis cohort keeps getting tested, which is what turns cohort revenue into steady-state run rate
+          </span>
+        </label>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Newly diagnosed patients / year (all 3 cancers, both regions)</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">{formatNumber(totalIncident)}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium text-slate-500">Projected annual revenue from newly diagnosed patients</p>
-          <p className="mt-1 text-2xl font-semibold text-accent-600">{formatCurrency(totalRevenue)}</p>
+          <p className="text-xs font-medium text-slate-500">Revenue from one diagnosis-year cohort</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{formatCurrency(totalCohortRevenue)}</p>
+        </div>
+        <div className="rounded-xl border border-accent-200 bg-accent-50 p-5 shadow-sm">
+          <p className="text-xs font-medium text-accent-700">Projected run-rate revenue ({yearsTested}-yr steady state)</p>
+          <p className="mt-1 text-2xl font-semibold text-accent-600">{formatCurrency(totalRunRateRevenue)}</p>
         </div>
       </div>
 
@@ -111,7 +137,8 @@ export default function MarketSizingCalculator() {
               <th className="px-4 py-2 font-medium">New diagnoses / yr</th>
               <th className="px-4 py-2 font-medium">Addressable patients</th>
               <th className="px-4 py-2 font-medium">Tests / yr</th>
-              <th className="px-4 py-2 font-medium">Revenue</th>
+              <th className="px-4 py-2 font-medium">Cohort revenue</th>
+              <th className="px-4 py-2 font-medium">Run-rate revenue</th>
             </tr>
           </thead>
           <tbody>
@@ -122,7 +149,8 @@ export default function MarketSizingCalculator() {
                 <td className="px-4 py-2 text-slate-700">{formatNumber(r.incidentPatients)}</td>
                 <td className="px-4 py-2 text-slate-700">{formatNumber(r.addressablePatients)}</td>
                 <td className="px-4 py-2 text-slate-700">{formatNumber(r.annualTests)}</td>
-                <td className="px-4 py-2 font-medium text-slate-900">{formatCurrency(r.revenue)}</td>
+                <td className="px-4 py-2 text-slate-700">{formatCurrency(r.cohortRevenue)}</td>
+                <td className="px-4 py-2 font-medium text-slate-900">{formatCurrency(r.runRateRevenue)}</td>
               </tr>
             ))}
           </tbody>
@@ -131,7 +159,8 @@ export default function MarketSizingCalculator() {
               <td className="px-4 py-2 text-slate-900" colSpan={5}>
                 Total
               </td>
-              <td className="px-4 py-2 text-slate-900">{formatCurrency(totalRevenue)}</td>
+              <td className="px-4 py-2 text-slate-900">{formatCurrency(totalCohortRevenue)}</td>
+              <td className="px-4 py-2 text-slate-900">{formatCurrency(totalRunRateRevenue)}</td>
             </tr>
           </tfoot>
         </table>

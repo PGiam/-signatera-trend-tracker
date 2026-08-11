@@ -24,8 +24,10 @@ import { SOURCES } from '../lib/market-data.js';
     </ul>
     <p class="mt-2">
       This models revenue from newly diagnosed patients only — it doesn't include Signatera's other indications
-      (ovarian cancer, immunotherapy monitoring across solid tumors), existing/prevalent patients already on
-      testing regimens, or year-over-year incidence growth. Treat it as a directional estimate, not a forecast.
+      (ovarian cancer, immunotherapy monitoring across solid tumors) or year-over-year incidence growth. Run-rate
+      revenue assumes steady state: incidence and market penetration held constant across the "years tested"
+      window, so the active testing population is simply new diagnoses × years tested, with no ramp-up or
+      ramp-down modeled. Treat it as a directional estimate, not a forecast.
     </p>
   </section>
 </DashboardLayout>

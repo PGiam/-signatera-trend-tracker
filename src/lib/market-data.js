@@ -62,7 +62,15 @@ export const PRICE_REFERENCE_POINTS = [
   { label: 'Medicare fee schedule (CPT/PLA 0340U, list price)', value: 3920 },
 ];
 
+// BESPOKE (Natera's own real-world observational study for colorectal
+// cancer) targets 2 years of MRD-testing follow-up per patient — used as
+// the default for converting single-cohort-year revenue into steady-state
+// run-rate revenue. Some NCCN surveillance windows for these cancers run
+// longer (up to ~5 years), so this is a conservative default, not a cap.
+export const DEFAULT_YEARS_TESTED = 2;
+
 export const SOURCES = [
+  { label: 'BESPOKE CRC study follow-up duration (Natera / Targeted Oncology)', url: 'https://www.targetedonc.com/view/breakthrough-device-designations-granted-to-novel-mrd-test-signatera' },
   { label: 'ACS Colorectal Cancer Facts & Figures 2026', url: 'https://www.cancer.org/research/cancer-facts-statistics/colorectal-cancer-facts-figures.html' },
   { label: 'ACS Cancer Facts & Figures 2026 (breast, bladder)', url: 'https://www.cancer.org/research/cancer-facts-statistics/all-cancer-facts-figures/2026-cancer-facts-figures.html' },
   { label: 'GLOBOCAN 2022 — Cancer burden in Europe (BMC Cancer)', url: 'https://link.springer.com/article/10.1186/s12885-025-13862-1' },
