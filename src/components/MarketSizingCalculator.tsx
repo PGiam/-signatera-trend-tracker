@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CANCER_TYPES, DEFAULT_PRICE_PER_TEST, DEFAULT_YEARS_TESTED, PRICE_REFERENCE_POINTS } from '../lib/market-data.js';
 
-const REGIONS = [
-  { key: 'us', label: 'United States' },
-  { key: 'intl', label: 'Western Europe + Japan' },
-] as const;
+type CancerInputs = { penetration: number; years: number; price: number };
 
 function formatNumber(n: number) {
   return Math.round(n).toLocaleString('en-US');
@@ -17,51 +14,57 @@ function formatCurrency(n: number) {
 }
 
 export default function MarketSizingCalculator() {
-  const [penetration, setPenetration] = useState(10);
   const [testsPerYear, setTestsPerYear] = useState(4);
-  const [pricePerTest, setPricePerTest] = useState(DEFAULT_PRICE_PER_TEST);
-  const [yearsTested, setYearsTested] = useState(DEFAULT_YEARS_TESTED);
+  const [perCancer, setPerCancer] = useState<Record<string, CancerInputs>>(() =>
+    Object.fromEntries(
+      CANCER_TYPES.map((c) => [c.slug, { penetration: 10, years: DEFAULT_YEARS_TESTED, price: DEFAULT_PRICE_PER_TEST }])
+    )
+  );
 
-  const rows = useMemo(() => {
-    return CANCER_TYPES.flatMap((cancer) =>
-      REGIONS.map((region) => {
-        const incidentPatients = cancer.incidence[region.key];
-        const addressablePatients = incidentPatients * (penetration / 100);
-        const annualTests = addressablePatients * testsPerYear;
-        const cohortRevenue = annualTests * pricePerTest;
-        // Run-rate: at steady state, patients from each of the last
-        // `yearsTested` diagnosis-year cohorts are still being actively
-        // monitored simultaneously, so the active testing population — and
-        // the revenue it generates — scales with that overlap.
-        const runRateRevenue = cohortRevenue * yearsTested;
-        return { cancer, region, incidentPatients, addressablePatients, annualTests, cohortRevenue, runRateRevenue };
-      })
-    );
-  }, [penetration, testsPerYear, pricePerTest, yearsTested]);
+  function updateCancer(slug: string, field: keyof CancerInputs, value: number) {
+    setPerCancer((prev) => ({ ...prev, [slug]: { ...prev[slug], [field]: value } }));
+  }
 
-  const totalCohortRevenue = rows.reduce((sum, r) => sum + r.cohortRevenue, 0);
-  const totalRunRateRevenue = rows.reduce((sum, r) => sum + r.runRateRevenue, 0);
-  const totalIncident = rows.reduce((sum, r) => sum + r.incidentPatients, 0);
+  const columns = useMemo(() => {
+    return CANCER_TYPES.map((cancer) => {
+      const inputs = perCancer[cancer.slug];
+      const diagnoses = cancer.incidence.us + cancer.incidence.intl;
+      const addressable = diagnoses * (inputs.penetration / 100);
+      const testsYr = addressable * testsPerYear;
+      const cohortRevenue = testsYr * inputs.price;
+      const runRateRevenue = cohortRevenue * inputs.years;
+      return { cancer, inputs, diagnoses, addressable, testsYr, cohortRevenue, runRateRevenue };
+    });
+  }, [perCancer, testsPerYear]);
+
+  const total = useMemo(() => {
+    const diagnoses = columns.reduce((s, c) => s + c.diagnoses, 0);
+    const addressable = columns.reduce((s, c) => s + c.addressable, 0);
+    const testsYr = columns.reduce((s, c) => s + c.testsYr, 0);
+    const cohortRevenue = columns.reduce((s, c) => s + c.cohortRevenue, 0);
+    const runRateRevenue = columns.reduce((s, c) => s + c.runRateRevenue, 0);
+    // Blended inputs for the Total column are derived from each cancer's
+    // chosen values, not entered independently — e.g. blended price is
+    // total revenue / total tests, which collapses to each column's own
+    // price when there's only one column and to a revenue-weighted average
+    // across columns otherwise.
+    return {
+      diagnoses,
+      addressable,
+      testsYr,
+      cohortRevenue,
+      runRateRevenue,
+      blendedPenetration: diagnoses > 0 ? (addressable / diagnoses) * 100 : 0,
+      blendedPrice: testsYr > 0 ? cohortRevenue / testsYr : 0,
+      blendedYears: cohortRevenue > 0 ? runRateRevenue / cohortRevenue : 0,
+    };
+  }, [columns]);
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-        <label className="block">
-          <span className="text-xs font-medium text-slate-500">Market penetration (%)</span>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={0.5}
-            value={penetration}
-            onChange={(e) => setPenetration(Number(e.target.value))}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
-          />
-          <span className="mt-1 block text-xs text-slate-400">Share of newly diagnosed patients who get tested</span>
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-medium text-slate-500">Avg. Signatera tests / patient / year</span>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <label className="block max-w-xs">
+          <span className="text-xs font-medium text-slate-500">Avg. Signatera tests / patient / year (shared across cancer types)</span>
           <input
             type="number"
             min={0}
@@ -72,59 +75,20 @@ export default function MarketSizingCalculator() {
           />
           <span className="mt-1 block text-xs text-slate-400">Serial monitoring means more than one test per patient per year</span>
         </label>
-
-        <label className="block">
-          <span className="text-xs font-medium text-slate-500">Avg. price paid / test ($)</span>
-          <input
-            type="number"
-            min={0}
-            step={25}
-            value={pricePerTest}
-            onChange={(e) => setPricePerTest(Number(e.target.value))}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
-          />
-          <div className="mt-1 flex flex-wrap gap-1">
-            {PRICE_REFERENCE_POINTS.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                onClick={() => setPricePerTest(p.value)}
-                className="rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-500 transition-colors hover:bg-slate-50"
-              >
-                {p.label}: ${formatNumber(p.value)}
-              </button>
-            ))}
-          </div>
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-medium text-slate-500">Avg. years tested per patient</span>
-          <input
-            type="number"
-            min={0}
-            step={0.5}
-            value={yearsTested}
-            onChange={(e) => setYearsTested(Number(e.target.value))}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
-          />
-          <span className="mt-1 block text-xs text-slate-400">
-            Default is BESPOKE's 2-year CRC follow-up window — how long each diagnosis cohort keeps getting tested, which is what turns cohort revenue into steady-state run rate
-          </span>
-        </label>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Newly diagnosed patients / year (all 3 cancers, both regions)</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">{formatNumber(totalIncident)}</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{formatNumber(total.diagnoses)}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Revenue from one diagnosis-year cohort</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-900">{formatCurrency(totalCohortRevenue)}</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-900">{formatCurrency(total.cohortRevenue)}</p>
         </div>
         <div className="rounded-xl border border-accent-200 bg-accent-50 p-5 shadow-sm">
-          <p className="text-xs font-medium text-accent-700">Projected run-rate revenue ({yearsTested}-yr steady state)</p>
-          <p className="mt-1 text-2xl font-semibold text-accent-600">{formatCurrency(totalRunRateRevenue)}</p>
+          <p className="text-xs font-medium text-accent-700">Projected run-rate revenue</p>
+          <p className="mt-1 text-2xl font-semibold text-accent-600">{formatCurrency(total.runRateRevenue)}</p>
         </div>
       </div>
 
@@ -132,37 +96,124 @@ export default function MarketSizingCalculator() {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500">
             <tr>
-              <th className="px-4 py-2 font-medium">Cancer type</th>
-              <th className="px-4 py-2 font-medium">Region</th>
-              <th className="px-4 py-2 font-medium">New diagnoses / yr</th>
-              <th className="px-4 py-2 font-medium">Addressable patients</th>
-              <th className="px-4 py-2 font-medium">Tests / yr</th>
-              <th className="px-4 py-2 font-medium">Cohort revenue</th>
-              <th className="px-4 py-2 font-medium">Run-rate revenue</th>
+              <th className="px-4 py-2 font-medium">&nbsp;</th>
+              {columns.map((c) => (
+                <th key={c.cancer.slug} className="px-4 py-2 font-medium">{c.cancer.label}</th>
+              ))}
+              <th className="px-4 py-2 font-medium">Total</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={`${r.cancer.slug}-${r.region.key}`} className="border-t border-slate-100">
-                <td className="px-4 py-2 text-slate-700">{r.cancer.label}</td>
-                <td className="px-4 py-2 text-slate-700">{r.region.label}</td>
-                <td className="px-4 py-2 text-slate-700">{formatNumber(r.incidentPatients)}</td>
-                <td className="px-4 py-2 text-slate-700">{formatNumber(r.addressablePatients)}</td>
-                <td className="px-4 py-2 text-slate-700">{formatNumber(r.annualTests)}</td>
-                <td className="px-4 py-2 text-slate-700">{formatCurrency(r.cohortRevenue)}</td>
-                <td className="px-4 py-2 font-medium text-slate-900">{formatCurrency(r.runRateRevenue)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-slate-200 bg-slate-50 font-medium">
-              <td className="px-4 py-2 text-slate-900" colSpan={5}>
-                Total
-              </td>
-              <td className="px-4 py-2 text-slate-900">{formatCurrency(totalCohortRevenue)}</td>
-              <td className="px-4 py-2 text-slate-900">{formatCurrency(totalRunRateRevenue)}</td>
+            <tr className="border-t border-slate-100">
+              <td className="px-4 py-2 text-slate-500">Market penetration (%)</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    value={c.inputs.penetration}
+                    onChange={(e) => updateCancer(c.cancer.slug, 'penetration', Number(e.target.value))}
+                    className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+                  />
+                </td>
+              ))}
+              <td className="px-4 py-2 text-slate-500 italic">{total.blendedPenetration.toFixed(1)}% (blended)</td>
             </tr>
-          </tfoot>
+
+            <tr className="border-t border-slate-100">
+              <td className="px-4 py-2 text-slate-500">Avg. years tested</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={c.inputs.years}
+                    onChange={(e) => updateCancer(c.cancer.slug, 'years', Number(e.target.value))}
+                    className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+                  />
+                </td>
+              ))}
+              <td className="px-4 py-2 text-slate-500 italic">{total.blendedYears.toFixed(2)} yrs (blended)</td>
+            </tr>
+
+            <tr className="border-t border-slate-100">
+              <td className="px-4 py-2 text-slate-500">Avg. price paid / test ($)</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={25}
+                    value={c.inputs.price}
+                    onChange={(e) => updateCancer(c.cancer.slug, 'price', Number(e.target.value))}
+                    className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+                  />
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    {PRICE_REFERENCE_POINTS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        title={p.label}
+                        onClick={() => updateCancer(c.cancer.slug, 'price', p.value)}
+                        className="w-fit rounded-full border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-500 transition-colors hover:bg-slate-50"
+                      >
+                        ${formatNumber(p.value)}
+                      </button>
+                    ))}
+                  </div>
+                </td>
+              ))}
+              <td className="px-4 py-2 text-slate-500 italic">${formatNumber(total.blendedPrice)} (blended)</td>
+            </tr>
+
+            <tr className="border-t border-slate-200">
+              <td className="px-4 py-2 text-slate-500">New diagnoses / yr</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2 text-slate-700">
+                  {formatNumber(c.diagnoses)}
+                  <span className="block text-[11px] text-slate-400">
+                    US {formatNumber(c.cancer.incidence.us)} · Intl {formatNumber(c.cancer.incidence.intl)}
+                  </span>
+                </td>
+              ))}
+              <td className="px-4 py-2 font-medium text-slate-900">{formatNumber(total.diagnoses)}</td>
+            </tr>
+
+            <tr className="border-t border-slate-100">
+              <td className="px-4 py-2 text-slate-500">Addressable patients</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2 text-slate-700">{formatNumber(c.addressable)}</td>
+              ))}
+              <td className="px-4 py-2 font-medium text-slate-900">{formatNumber(total.addressable)}</td>
+            </tr>
+
+            <tr className="border-t border-slate-100">
+              <td className="px-4 py-2 text-slate-500">Tests / yr</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2 text-slate-700">{formatNumber(c.testsYr)}</td>
+              ))}
+              <td className="px-4 py-2 font-medium text-slate-900">{formatNumber(total.testsYr)}</td>
+            </tr>
+
+            <tr className="border-t border-slate-100">
+              <td className="px-4 py-2 text-slate-500">Cohort revenue</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2 text-slate-700">{formatCurrency(c.cohortRevenue)}</td>
+              ))}
+              <td className="px-4 py-2 font-medium text-slate-900">{formatCurrency(total.cohortRevenue)}</td>
+            </tr>
+
+            <tr className="border-t border-slate-200 bg-accent-50/50 font-medium">
+              <td className="px-4 py-2 text-slate-900">Total annual revenue (run-rate)</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2 text-accent-700">{formatCurrency(c.runRateRevenue)}</td>
+              ))}
+              <td className="px-4 py-2 text-accent-700">{formatCurrency(total.runRateRevenue)}</td>
+            </tr>
+          </tbody>
         </table>
       </div>
 
