@@ -5,13 +5,15 @@ import { webDedupKey, normalizeUrl, insertMentionsIgnoringDuplicates } from './l
 import { PRODUCTS, MEDICAL_NEWS_ALLOWLIST, PATIENT_FORUM_ALLOWLIST, isBlockedUrl } from './lib/products.js';
 
 const RAW_TEXT_CAP = 8000;
-// A declared bot UA gets a hard 403 from some sites we need (e.g.
-// connect.mayoclinic.org) even though the same pages are public and openly
-// indexed by search engines. This only affects which UA string rides along
-// with the request for pages we've already decided (via robots.txt +
-// SOURCE_BLOCKLIST) we're allowed to fetch — not an attempt to get at
-// anything gated.
-const USER_AGENT =
+// Different sites want opposite things here: medical-news publishers
+// (OncLive/TargetedOnc/CancerTherapyAdvisor/Medscape) 403 a browser UA but
+// tolerate an honestly-declared bot; patient-forum platforms like
+// connect.mayoclinic.org do the reverse. Try the honest UA first (it's the
+// one we'd rather use), fall back to a browser UA only on 403 — for pages
+// we've already decided (via robots.txt + SOURCE_BLOCKLIST) we're allowed
+// to fetch, not an attempt to get at anything gated.
+const BOT_USER_AGENT = 'SignateraTrendTrackerBot/1.0 (+research tool; contact via GitHub repo)';
+const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
 function truncate(text) {
@@ -79,11 +81,21 @@ function extractPublishedDate(html) {
   return null;
 }
 
-async function extractArticleText(url) {
+async function fetchWithUserAgentFallback(url) {
   const res = await fetch(url, {
-    headers: { 'User-Agent': USER_AGENT },
+    headers: { 'User-Agent': BOT_USER_AGENT },
     signal: AbortSignal.timeout(15000),
   });
+  if (res.status !== 403) return res;
+
+  return fetch(url, {
+    headers: { 'User-Agent': BROWSER_USER_AGENT },
+    signal: AbortSignal.timeout(15000),
+  });
+}
+
+async function extractArticleText(url) {
+  const res = await fetchWithUserAgentFallback(url);
   if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
   const html = await res.text();
 
