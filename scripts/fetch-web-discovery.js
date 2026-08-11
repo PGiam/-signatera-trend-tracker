@@ -2,7 +2,7 @@ import 'dotenv/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { getServiceClient } from './lib/supabase-client.js';
 import { webDedupKey, normalizeUrl, insertMentionsIgnoringDuplicates } from './lib/dedup.js';
-import { PRODUCTS, MEDICAL_NEWS_ALLOWLIST, isBlockedUrl } from './lib/products.js';
+import { PRODUCTS, MEDICAL_NEWS_ALLOWLIST, PATIENT_FORUM_ALLOWLIST, isBlockedUrl } from './lib/products.js';
 
 const RAW_TEXT_CAP = 8000;
 const USER_AGENT = 'SignateraTrendTrackerBot/1.0 (+research tool; contact via GitHub repo)';
@@ -97,12 +97,13 @@ async function main() {
   const supabase = getServiceClient();
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const [generalUrls, medicalNewsUrls] = await Promise.all([
+  const [generalUrls, medicalNewsUrls, patientForumUrls] = await Promise.all([
     discoverUrls(anthropic),
     discoverUrls(anthropic, { allowedDomains: MEDICAL_NEWS_ALLOWLIST }),
+    discoverUrls(anthropic, { allowedDomains: PATIENT_FORUM_ALLOWLIST }),
   ]);
 
-  const candidateUrls = [...new Set([...generalUrls, ...medicalNewsUrls])].filter((url) => {
+  const candidateUrls = [...new Set([...generalUrls, ...medicalNewsUrls, ...patientForumUrls])].filter((url) => {
     try {
       return !isBlockedUrl(url);
     } catch {

@@ -46,6 +46,18 @@ export const MEDICAL_NEWS_ALLOWLIST = [
   'cancertherapyadvisor.com',
 ];
 
+// Public (no login required to read) patient-community forums — same idea
+// as TARGET_SUBREDDITS, just outside Reddit. Scanned via a domain-scoped web
+// search, same pattern as MEDICAL_NEWS_ALLOWLIST.
+export const PATIENT_FORUM_ALLOWLIST = [
+  'connect.mayoclinic.org',
+  'breastcancer.org',
+  'smartpatients.com',
+  'cancercompass.com',
+  'healthunlocked.com',
+  'csn.cancer.org',
+];
+
 // Sources that either require a login, or whose ToS prohibits scraping.
 // Enforced as a hard blocklist regardless of what web search surfaces.
 export const SOURCE_BLOCKLIST = [
