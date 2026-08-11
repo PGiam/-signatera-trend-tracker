@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CANCER_TYPES, DEFAULT_PRICE_PER_TEST, DEFAULT_YEARS_TESTED, PRICE_REFERENCE_POINTS } from '../lib/market-data.js';
 
-type CancerInputs = { penetration: number; years: number; price: number };
+type CancerInputs = { penetration: number; testsPerYear: number; years: number; price: number };
 
 function formatNumber(n: number) {
   return Math.round(n).toLocaleString('en-US');
@@ -14,10 +14,12 @@ function formatCurrency(n: number) {
 }
 
 export default function MarketSizingCalculator() {
-  const [testsPerYear, setTestsPerYear] = useState(4);
   const [perCancer, setPerCancer] = useState<Record<string, CancerInputs>>(() =>
     Object.fromEntries(
-      CANCER_TYPES.map((c) => [c.slug, { penetration: 10, years: DEFAULT_YEARS_TESTED, price: DEFAULT_PRICE_PER_TEST }])
+      CANCER_TYPES.map((c) => [
+        c.slug,
+        { penetration: 10, testsPerYear: 4, years: DEFAULT_YEARS_TESTED, price: DEFAULT_PRICE_PER_TEST },
+      ])
     )
   );
 
@@ -30,12 +32,12 @@ export default function MarketSizingCalculator() {
       const inputs = perCancer[cancer.slug];
       const diagnoses = cancer.incidence.us + cancer.incidence.intl;
       const addressable = diagnoses * (inputs.penetration / 100);
-      const testsYr = addressable * testsPerYear;
+      const testsYr = addressable * inputs.testsPerYear;
       const cohortRevenue = testsYr * inputs.price;
       const runRateRevenue = cohortRevenue * inputs.years;
       return { cancer, inputs, diagnoses, addressable, testsYr, cohortRevenue, runRateRevenue };
     });
-  }, [perCancer, testsPerYear]);
+  }, [perCancer]);
 
   const total = useMemo(() => {
     const diagnoses = columns.reduce((s, c) => s + c.diagnoses, 0);
@@ -55,6 +57,7 @@ export default function MarketSizingCalculator() {
       cohortRevenue,
       runRateRevenue,
       blendedPenetration: diagnoses > 0 ? (addressable / diagnoses) * 100 : 0,
+      blendedTestsPerYear: addressable > 0 ? testsYr / addressable : 0,
       blendedPrice: testsYr > 0 ? cohortRevenue / testsYr : 0,
       blendedYears: cohortRevenue > 0 ? runRateRevenue / cohortRevenue : 0,
     };
@@ -62,22 +65,7 @@ export default function MarketSizingCalculator() {
 
   return (
     <div>
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <label className="block max-w-xs">
-          <span className="text-xs font-medium text-slate-500">Avg. Signatera tests / patient / year (shared across cancer types)</span>
-          <input
-            type="number"
-            min={0}
-            step={0.5}
-            value={testsPerYear}
-            onChange={(e) => setTestsPerYear(Number(e.target.value))}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
-          />
-          <span className="mt-1 block text-xs text-slate-400">Serial monitoring means more than one test per patient per year</span>
-        </label>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-500">Newly diagnosed patients / year (all 3 cancers, both regions)</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">{formatNumber(total.diagnoses)}</p>
@@ -188,6 +176,23 @@ export default function MarketSizingCalculator() {
                 <td key={c.cancer.slug} className="px-4 py-2 text-slate-700">{formatNumber(c.addressable)}</td>
               ))}
               <td className="px-4 py-2 font-medium text-slate-900">{formatNumber(total.addressable)}</td>
+            </tr>
+
+            <tr className="border-t border-slate-100">
+              <td className="px-4 py-2 text-slate-500">Avg. tests / patient / yr</td>
+              {columns.map((c) => (
+                <td key={c.cancer.slug} className="px-4 py-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={c.inputs.testsPerYear}
+                    onChange={(e) => updateCancer(c.cancer.slug, 'testsPerYear', Number(e.target.value))}
+                    className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+                  />
+                </td>
+              ))}
+              <td className="px-4 py-2 text-slate-500 italic">{total.blendedTestsPerYear.toFixed(2)} (blended)</td>
             </tr>
 
             <tr className="border-t border-slate-100">
