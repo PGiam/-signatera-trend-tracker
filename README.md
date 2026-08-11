@@ -6,7 +6,7 @@ Tracks public mentions of Signatera, Guardant360, and FoundationOne Liquid acros
 
 ### 1. Supabase project
 1. Create a new Supabase project (separate from any other project you run).
-2. In the SQL Editor, run `sql/001_init_schema.sql`, then `sql/002_readonly_role_and_views.sql` — **edit the placeholder password in `002_...sql` before running it**, and save the password somewhere safe.
+2. In the SQL Editor, run `sql/001_init_schema.sql`, then `sql/002_readonly_role_and_views.sql` — **edit the placeholder password in `002_...sql` before running it**, and save the password somewhere safe. Also run `sql/003_disable_rls.sql` and `sql/004_trend_reports.sql`.
 3. From Project Settings → API, note the **Project URL**, **anon public key**, and **service_role key**.
 4. From Project Settings → Database, get the **connection string** — use the **transaction pooler** (IPv4-compatible, works from serverless functions), not the direct connection — and swap in `app_readonly_query` as the user and the password you set above — this becomes `SUPABASE_READONLY_DB_URL`.
 

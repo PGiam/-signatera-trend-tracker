@@ -24,6 +24,13 @@ const { data: weeklyRows, error } = await supabase
   .select('week_start, product_id, author_type, mention_count, avg_sentiment_score')
   .order('week_start', { ascending: true });
 
+const { data: latestReport } = await supabase
+  .from('trend_reports')
+  .select('report_text, generated_at')
+  .order('generated_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
 const byWeek = collapseWeekly(weeklyRows ?? [], authorTypesForView(view));
 const { volume, sentiment, weeks } = buildChartSeries(byWeek, productsBySlug);
 const wow = computeWowStats(byWeek, weeks, productsBySlug);
@@ -112,6 +119,22 @@ function shareText(n) {
           ))}
         </ul>
       </section>
+
+      {latestReport && (
+        <section class="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div class="flex items-baseline justify-between">
+            <h2 class="text-sm font-semibold text-slate-900">Trend report</h2>
+            <span class="text-xs text-slate-400">
+              Generated {new Date(latestReport.generated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          </div>
+          <div class="mt-3 space-y-3 text-sm leading-relaxed text-slate-700">
+            {latestReport.report_text.split(/\n{2,}/).map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+          </div>
+        </section>
+      )}
     </>
   )}
 </DashboardLayout>
