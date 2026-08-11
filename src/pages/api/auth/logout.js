@@ -1,9 +1,6 @@
-import { getServerSupabase } from '../../../lib/supabase-server.js';
-
 export const prerender = false;
 
-export async function POST(context) {
-  const supabase = getServerSupabase(context);
-  await supabase.auth.signOut();
-  return context.redirect('/login');
+export async function POST({ cookies, redirect }) {
+  cookies.delete('dashboard_access', { path: '/' });
+  return redirect('/login');
 }

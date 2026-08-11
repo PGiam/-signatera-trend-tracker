@@ -8,9 +8,9 @@ Tracks public mentions of Signatera, Guardant360, and FoundationOne Liquid acros
 1. Create a new Supabase project (separate from any other project you run).
 2. In the SQL Editor, run `sql/001_init_schema.sql`, then `sql/002_readonly_role_and_views.sql` — **edit the placeholder password in `002_...sql` before running it**, and save the password somewhere safe.
 3. From Project Settings → API, note the **Project URL**, **anon public key**, and **service_role key**.
-4. From Project Settings → Database, get the **connection string** (direct connection, not the pooler) and swap in `app_readonly_query` as the user and the password you set above — this becomes `SUPABASE_READONLY_DB_URL`.
-5. Under Authentication → URL Configuration, add your Netlify site URL (once you have it) as a redirect URL, e.g. `https://your-site.netlify.app/api/auth/callback`.
-6. Under Authentication → Providers → Email, email/OTP sign-in should be on by default — that's what the login page uses (magic link, no password).
+4. From Project Settings → Database, get the **connection string** — use the **transaction pooler** (IPv4-compatible, works from serverless functions), not the direct connection — and swap in `app_readonly_query` as the user and the password you set above — this becomes `SUPABASE_READONLY_DB_URL`.
+
+Dashboard access uses a single shared passcode (`DASHBOARD_PASSCODE`, set in Netlify env vars), not Supabase Auth — no email/redirect-URL setup needed.
 
 ### 2. Reddit API credentials
 1. Log into reddit.com (a dedicated bot account is cleaner than your personal one).
@@ -32,8 +32,8 @@ Tracks public mentions of Signatera, Guardant360, and FoundationOne Liquid acros
 ### 5. Netlify site
 1. New site from Git → pick the repo → build command `npm run build`, publish directory `dist` (already set in `netlify.toml`).
 2. Site settings → Environment variables, add:
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_READONLY_DB_URL`, `ANTHROPIC_API_KEY`, `ALLOWED_EMAIL` (your email — only this address can sign in).
-3. Deploy. Visit the site, go to `/login`, enter your email, click the magic link from your inbox.
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_READONLY_DB_URL`, `ANTHROPIC_API_KEY`, `DASHBOARD_PASSCODE` (whatever passcode you want to share with viewers).
+3. Deploy. Visit the site, go to `/login`, enter the passcode.
 
 ## Local development
 

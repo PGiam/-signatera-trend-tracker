@@ -1,10 +1,14 @@
 import { defineMiddleware } from 'astro:middleware';
-import { getServerSupabase } from './lib/supabase-server.js';
+import { createHash } from 'node:crypto';
 
-// This is a single-user personal dashboard: the allowlisted email is the
-// only account permitted in, regardless of what Supabase Auth itself would
-// allow to sign up.
-const PUBLIC_PATHS = ['/login', '/api/auth/send-otp', '/api/auth/callback'];
+// Low-stakes shared-passcode gate — this dashboard is meant to be shareable
+// with a handful of people via one passcode, not locked to a single email
+// account. Anyone holding the cookie (or the passcode) can view it.
+const PUBLIC_PATHS = ['/login', '/api/auth/verify-passcode'];
+
+function expectedCookieValue() {
+  return createHash('sha256').update(import.meta.env.DASHBOARD_PASSCODE || '').digest('hex');
+}
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
@@ -12,16 +16,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return next();
   }
 
-  const supabase = getServerSupabase(context);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const allowedEmail = (import.meta.env.ALLOWED_EMAIL || '').toLowerCase();
-  if (!user || user.email?.toLowerCase() !== allowedEmail) {
+  const cookie = context.cookies.get('dashboard_access')?.value;
+  if (!cookie || cookie !== expectedCookieValue()) {
     return context.redirect('/login');
   }
 
-  context.locals.user = user;
   return next();
 });
