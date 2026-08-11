@@ -14,10 +14,13 @@ export async function POST(context) {
   }
 
   const supabase = getServerSupabase(context);
-  await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: `${url.origin}/api/auth/callback` },
   });
+  // Still respond ok:true either way — this endpoint deliberately never
+  // reveals to the client whether sending failed, only logs it server-side.
+  if (error) console.error('signInWithOtp failed:', error.status, error.message);
 
   return new Response(JSON.stringify({ ok: true }), { status: 200 });
 }
