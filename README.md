@@ -12,8 +12,11 @@ Tracks public mentions of Signatera, Guardant360, and FoundationOne Liquid acros
 
 Dashboard access uses a single shared passcode (`DASHBOARD_PASSCODE`, set in Netlify env vars), not Supabase Auth — no email/redirect-URL setup needed.
 
-### 2. Reddit — currently disabled, see "Known limitations"
-Both Reddit's OAuth script-app registration (requires manual approval for a moderation use case) and unauthenticated `.json` scraping (blocked outright — redirects to a login wall) are dead ends right now. `scripts/fetch-reddit.js` is left in place but not wired into `pipeline.yml`. Nothing to set up here unless you revisit this later.
+### 2. Reddit — via Apify
+Both Reddit's OAuth script-app registration (requires manual approval for a moderation use case) and unauthenticated `.json` scraping (blocked outright since May 2026 — redirects to a login wall) are dead ends. `scripts/fetch-reddit.js` instead uses Apify's `trudax/reddit-scraper-lite` actor, which automates a real browser to get past that.
+1. Create an account at apify.com and set up billing (the actor costs roughly $1.50–2/1,000 results; this project's usage is a few dollars a month).
+2. Console → Settings → API & Integrations → copy your personal API token.
+3. Set it as `APIFY_API_TOKEN` locally (`.env`) and in the GitHub repo secret of the same name.
 
 ### 3. YouTube API key
 1. console.cloud.google.com → new project (or reuse one) → API Library → enable **YouTube Data API v3**.
@@ -52,7 +55,7 @@ npm run aggregate
 
 ## Known limitations
 
-- **Reddit ingestion is disabled.** Reddit now requires manual, moderation-use-case-gated approval to register a script app (the OAuth flow this project originally used), and separately blocks unauthenticated access to its public `.json` endpoints (redirects to a login wall on both `www.reddit.com` and `old.reddit.com`) — confirmed 2026-08-11, not a config issue on our end. `scripts/fetch-reddit.js` is fully implemented against the unauthenticated endpoints and works as code, it's just blocked upstream. Revisit by either submitting Reddit's approval request (`https://support.reddithelp.com/hc/requests/new?ticket_form_id=14868593862164`) or trying a headless-browser-based scrape, then re-add a `reddit` job to `.github/workflows/pipeline.yml`.
+- **Reddit ingestion runs through a third-party scraper (Apify), not Reddit directly.** Reddit shut down unauthenticated `.json` access entirely and gates OAuth script-app registration behind manual moderation-use-case approval, so `scripts/fetch-reddit.js` uses Apify's `trudax/reddit-scraper-lite` actor instead — a more deliberate workaround than the rest of this pipeline, since Reddit intentionally closed both paths off. It costs a few dollars a month; if Apify ever changes pricing or the actor breaks, this is the source most likely to need attention.
 - Doctor-side content will be sparse and skew toward medical-news-site commentary (OncLive, Medscape, Healio, Targeted Oncology) rather than organic reviews — doctors don't generally post public reviews of diagnostic tests the way patients describe their experience.
 - Web discovery is the noisiest ingestion source; classification's `product_match_confidence` filters most false positives, but some will get through, especially early on.
 - Sentiment and author-type classification is an LLM heuristic with stored reasoning per row (`author_type_reasoning`), not ground truth. Trust the trend *direction* over time more than any single row's label.
