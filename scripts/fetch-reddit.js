@@ -94,7 +94,7 @@ async function fetchSitewideRows() {
     searchPosts: true,
     searchComments: false,
     sort: 'new',
-    time: 'week', // ingestion runs every 3 days; a week window overlaps generously, dedup handles repeats
+    time: 'year', // widened from 'week' — dedup handles repeats across runs, and this project favors full history over rolling windows elsewhere (charts, web discovery)
     maxPostCount: 30,
     skipComments: true,
     includeNSFW: false,
@@ -104,14 +104,12 @@ async function fetchSitewideRows() {
 
 // Scoped scan of the disease-specific subreddits where actual patient/doctor
 // discussion of these tests lives, including comments — same role as the old
-// scanTargetSubreddits(). Keeping per-subreddit/per-post caps modest bounds
-// Apify usage cost since, unlike the old script, comments here can't be
-// fetched only for posts that already matched a product term.
+// scanTargetSubreddits().
 async function fetchSubredditRows() {
   const items = await runActor({
     startUrls: TARGET_SUBREDDITS.map((sub) => ({ url: `https://www.reddit.com/r/${sub}/new/` })),
-    maxPostCount: 25,
-    maxComments: 10,
+    maxPostCount: 100,
+    maxComments: 25,
     skipComments: false,
     includeNSFW: false,
   });
