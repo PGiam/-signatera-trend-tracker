@@ -6,10 +6,18 @@ const EXAMPLES = [
   'Which product has the most negative patient sentiment right now?',
 ];
 
-export default function AskBox() {
-  const [question, setQuestion] = useState('');
+type AskBoxProps = {
+  initialQuestion?: string | null;
+  initialAnswer?: string | null;
+  initialSql?: string | null;
+};
+
+export default function AskBox({ initialQuestion, initialAnswer, initialSql }: AskBoxProps) {
+  const [question, setQuestion] = useState(initialQuestion ?? '');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ answer: string; sql: string | null; rows: unknown[] } | null>(null);
+  const [result, setResult] = useState<{ answer: string; sql: string | null; rows: unknown[] } | null>(
+    initialAnswer ? { answer: initialAnswer, sql: initialSql ?? null, rows: [] } : null
+  );
   const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 

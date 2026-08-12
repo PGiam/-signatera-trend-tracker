@@ -1,6 +1,21 @@
 ---
 import DashboardLayout from '../layouts/DashboardLayout.astro';
 import AskBox from '../components/AskBox.tsx';
+import { getServiceClient } from '../lib/supabase.js';
+
+// Show the last asked question/answer by default, persisting across page
+// loads until someone asks a new one — rather than always starting blank.
+// Rows aren't stored in query_log (only row_count), so a restored answer
+// has no "show raw data" detail, only the question/answer/SQL.
+const supabase = getServiceClient();
+const { data: lastQuery } = await supabase
+  .from('query_log')
+  .select('question, answer, generated_sql')
+  .eq('sql_valid', true)
+  .not('answer', 'is', null)
+  .order('asked_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
 ---
 <DashboardLayout title="Ask · Signatera Trend Tracker">
   <h1 class="text-xl font-semibold text-slate-900">Ask the data</h1>
@@ -9,6 +24,11 @@ import AskBox from '../components/AskBox.tsx';
     modify the underlying data.
   </p>
   <div class="mt-6">
-    <AskBox client:load />
+    <AskBox
+      client:load
+      initialQuestion={lastQuery?.question}
+      initialAnswer={lastQuery?.answer}
+      initialSql={lastQuery?.generated_sql}
+    />
   </div>
 </DashboardLayout>
