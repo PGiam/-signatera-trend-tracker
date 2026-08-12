@@ -50,24 +50,21 @@ export const CANCER_TYPES = [
   },
 ];
 
-// Natera's own disclosed blended average selling price per Signatera test
-// (all payers combined — Medicare, commercial, self-pay, international),
-// from Q2 2026 investor materials. This is the realistic "what Signatera
-// actually gets paid" figure, not the Medicare-only list price.
-export const DEFAULT_PRICE_PER_TEST = 1275;
-
+// Reference price points shown as quick-select buttons next to the price
+// input. 1275 is Natera's own disclosed blended average selling price per
+// Signatera test (all payers combined — Medicare, commercial, self-pay,
+// international) from Q2 2026 investor materials — the realistic "what
+// Signatera actually gets paid" figure, not the Medicare-only list price.
 export const PRICE_REFERENCE_POINTS = [
-  { label: 'Natera Q2 2026 blended ASP (default)', value: 1275 },
+  { label: 'Natera Q2 2026 blended ASP', value: 1275 },
   { label: "Natera's long-term ASP target", value: 2000 },
   { label: 'Medicare fee schedule (CPT/PLA 0340U, list price)', value: 3920 },
 ];
 
 // BESPOKE (Natera's own real-world observational study for colorectal
-// cancer) targets 2 years of MRD-testing follow-up per patient — used as
-// the default for converting single-cohort-year revenue into steady-state
-// run-rate revenue. Some NCCN surveillance windows for these cancers run
-// longer (up to ~5 years), so this is a conservative default, not a cap.
-export const DEFAULT_YEARS_TESTED = 2;
+// cancer) found a 2-year window of MRD-testing follow-up per patient — cited
+// as context for the "years tested" input; some NCCN surveillance windows
+// for these cancers run longer (up to ~5 years).
 
 export const SOURCES = [
   { label: 'BESPOKE CRC study follow-up duration (Natera / Targeted Oncology)', url: 'https://www.targetedonc.com/view/breakthrough-device-designations-granted-to-novel-mrd-test-signatera' },

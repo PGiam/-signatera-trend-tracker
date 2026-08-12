@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react';
-import { CANCER_TYPES, DEFAULT_PRICE_PER_TEST, DEFAULT_YEARS_TESTED, PRICE_REFERENCE_POINTS } from '../lib/market-data.js';
+import { CANCER_TYPES, PRICE_REFERENCE_POINTS } from '../lib/market-data.js';
 
 type CancerInputs = { penetration: number; testsPerYear: number; years: number; price: number };
+
+// Working-assumption defaults per cancer type (not sourced reference data —
+// see PRICE_REFERENCE_POINTS and the per-cancer notes below the table for
+// the actual cited figures; these are just where the calculator starts).
+const DEFAULT_INPUTS: Record<string, CancerInputs> = {
+  colorectal: { penetration: 30, testsPerYear: 2.75, years: 4, price: 1500 },
+  breast: { penetration: 10, testsPerYear: 4, years: 5, price: 1500 },
+  bladder: { penetration: 10, testsPerYear: 6, years: 1, price: 1500 },
+};
 
 function formatNumber(n: number) {
   return Math.round(n).toLocaleString('en-US');
@@ -15,12 +24,7 @@ function formatCurrency(n: number) {
 
 export default function MarketSizingCalculator() {
   const [perCancer, setPerCancer] = useState<Record<string, CancerInputs>>(() =>
-    Object.fromEntries(
-      CANCER_TYPES.map((c) => [
-        c.slug,
-        { penetration: 10, testsPerYear: 4, years: DEFAULT_YEARS_TESTED, price: DEFAULT_PRICE_PER_TEST },
-      ])
-    )
+    Object.fromEntries(CANCER_TYPES.map((c) => [c.slug, { ...DEFAULT_INPUTS[c.slug] }]))
   );
 
   function updateCancer(slug: string, field: keyof CancerInputs, value: number) {
