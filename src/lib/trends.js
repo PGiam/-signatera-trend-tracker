@@ -8,16 +8,17 @@ export function authorTypesForView(view) {
 }
 
 /**
- * Collapses weekly rollup rows (one per product_id x author_type x week) into
- * one row per product_id x week, respecting an optional author_type filter.
- * Returns a Map<week_start, Map<product_id, {mentionCount, sentimentSum}>>.
+ * Collapses rollup rows (one per product_id x author_type x period) into one
+ * row per product_id x period, respecting an optional author_type filter.
+ * Returns a Map<periodKey, Map<product_id, {mentionCount, sentimentSum}>>.
  */
-export function collapseWeekly(rows, allowedAuthorTypes) {
-  const byWeek = new Map();
+function collapseByPeriod(rows, periodKeyFn, allowedAuthorTypes) {
+  const byPeriod = new Map();
   for (const row of rows) {
     if (allowedAuthorTypes && !allowedAuthorTypes.includes(row.author_type)) continue;
-    if (!byWeek.has(row.week_start)) byWeek.set(row.week_start, new Map());
-    const byProduct = byWeek.get(row.week_start);
+    const period = periodKeyFn(row);
+    if (!byPeriod.has(period)) byPeriod.set(period, new Map());
+    const byProduct = byPeriod.get(period);
     if (!byProduct.has(row.product_id)) {
       byProduct.set(row.product_id, { mentionCount: 0, sentimentSum: 0 });
     }
@@ -26,7 +27,17 @@ export function collapseWeekly(rows, allowedAuthorTypes) {
     agg.mentionCount += count;
     agg.sentimentSum += (Number(row.avg_sentiment_score) || 0) * count;
   }
-  return byWeek;
+  return byPeriod;
+}
+
+export function collapseWeekly(rows, allowedAuthorTypes) {
+  return collapseByPeriod(rows, (row) => row.week_start, allowedAuthorTypes);
+}
+
+// From mention_rollups_daily rows (rollup_date is a plain 'YYYY-MM-DD'
+// string from Postgres) — buckets into calendar months.
+export function collapseMonthly(rows, allowedAuthorTypes) {
+  return collapseByPeriod(rows, (row) => row.rollup_date.slice(0, 7), allowedAuthorTypes);
 }
 
 export function buildChartSeries(byWeek, productsBySlug) {
@@ -45,6 +56,37 @@ export function buildChartSeries(byWeek, productsBySlug) {
     sentiment.push(sentimentRow);
   }
   return { volume, sentiment, weeks };
+}
+
+/**
+ * Cumulative (expanding-window) weighted average sentiment per period — at
+ * each period, averages every mention from the start of history through
+ * that period, not just that period's own mentions. Smooths out
+ * week-to-week/month-to-month noise (especially early on when volume per
+ * period is low) in exchange for reacting more slowly to real shifts.
+ */
+export function buildCumulativeSentimentSeries(byPeriod, productsBySlug) {
+  const periods = [...byPeriod.keys()].sort();
+  const running = {};
+  for (const product of Object.values(productsBySlug)) {
+    running[product.id] = { count: 0, sum: 0 };
+  }
+
+  const sentiment = [];
+  for (const period of periods) {
+    const row = { date: period };
+    for (const [slug, product] of Object.entries(productsBySlug)) {
+      const agg = byPeriod.get(period)?.get(product.id);
+      if (agg && agg.mentionCount > 0) {
+        running[product.id].count += agg.mentionCount;
+        running[product.id].sum += agg.sentimentSum;
+      }
+      const r = running[product.id];
+      row[slug] = r.count > 0 ? Number((r.sum / r.count).toFixed(2)) : null;
+    }
+    sentiment.push(row);
+  }
+  return { sentiment, periods };
 }
 
 export function computeWowStats(byWeek, weeks, productsBySlug) {
