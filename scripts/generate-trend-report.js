@@ -14,11 +14,17 @@ async function fetchWeeklyRollups(supabase) {
   return data ?? [];
 }
 
+// See sql/004_product_match_confidence_filter.sql — a weak product_match_confidence
+// means ingestion's product guess (e.g. from a generic "ctDNA test" mention) is
+// shaky, so don't let it anchor a specific product's narrative.
+const MIN_PRODUCT_MATCH_CONFIDENCE = 0.5;
+
 async function fetchClassifiedMentions(supabase) {
   const { data, error } = await supabase
     .from('raw_mentions')
     .select('product_id, author_type, sentiment, sentiment_score, author_type_reasoning, raw_text, published_at, discovered_at, source')
     .not('classified_at', 'is', null)
+    .gte('product_match_confidence', MIN_PRODUCT_MATCH_CONFIDENCE)
     .order('published_at', { ascending: true, nullsFirst: false });
   if (error) throw error;
   return data ?? [];

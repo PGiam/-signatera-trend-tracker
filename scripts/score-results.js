@@ -21,7 +21,7 @@ const CLASSIFY_TOOL = {
             id: { type: 'string', description: 'The mention id, copied exactly from the input.' },
             product_match_confidence: {
               type: 'number',
-              description: '0.00-1.00: confidence this text is genuinely discussing the named test as a product/device, not incidental (e.g. company financial news, unrelated homonym).',
+              description: '0.00-1.00: confidence this text is genuinely discussing the named test as a product/device, not incidental (e.g. company financial news, unrelated homonym) — AND that the named product is actually correct, not just a generic ctDNA/MRD test guessed to be this brand without the text actually naming or clearly implying it (in that case, score low even if the discussion itself is genuine).',
             },
             author_type: {
               type: 'string',
@@ -53,7 +53,7 @@ const CLASSIFY_TOOL = {
 
 const SYSTEM_PROMPT = `You classify public mentions of medical diagnostic tests (Signatera, Guardant360, FoundationOne Liquid — ctDNA/MRD cancer tests) for a sentiment-tracking tool. For each mention, determine:
 
-- product_match_confidence: is this genuinely about the test itself, or incidental (PR/investor news, an unrelated use of the same word)?
+- product_match_confidence: is this genuinely about the test itself (not incidental — PR/investor news, an unrelated use of the same word), AND does the text actually name or clearly imply this specific brand rather than just describing a generic ctDNA/MRD test that could equally be a competitor? Some mentions come from an upstream guess at which brand a generically-worded post refers to — score those low unless the text itself gives a real signal.
 - author_type, using these signals:
   - doctor / healthcare_professional: byline credentials (MD, DO, NP, PA), "Dr. X, oncologist at Y" attribution, published as expert commentary on a medical-news site (OncLive, Medscape, Healio, Targeted Oncology, Cancer Therapy Advisor), first-person clinical language ("in my practice", "I order this test for patients with...").
   - patient / caregiver: first-person illness narrative, posted in a patient-support subreddit or as a YouTube comment on a patient testimonial video, questions about cost/insurance/side effects/result interpretation from a recipient's or family member's perspective.

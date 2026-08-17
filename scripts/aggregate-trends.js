@@ -15,12 +15,18 @@ function effectiveDate(row) {
   return dayBucket(row.published_at ?? row.discovered_at);
 }
 
+// Rows with a weak product_match_confidence (e.g. a generic "ctDNA test"
+// mention Reddit ingestion guessed a specific brand for) shouldn't count
+// toward that brand's trend numbers — see sql/004_product_match_confidence_filter.sql.
+const MIN_PRODUCT_MATCH_CONFIDENCE = 0.5;
+
 async function fetchRecentClassifiedRows(supabase) {
   const cutoff = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('raw_mentions')
     .select('product_id, author_type, sentiment_score, published_at, discovered_at')
     .not('classified_at', 'is', null)
+    .gte('product_match_confidence', MIN_PRODUCT_MATCH_CONFIDENCE)
     .gte('discovered_at', cutoff)
     .limit(FETCH_LIMIT);
   if (error) throw error;
